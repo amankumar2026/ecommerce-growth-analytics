@@ -1,0 +1,10 @@
+{
+  "name": "Ecommerce Analytics",
+  "dataColors": ["#2563EB", "#F59E0B", "#10B981", "#EF4444", "#8B5CF6", "#06B6D4", "#6B7280", "#EC4899"],
+  "background": "#FFFFFF",
+  "foreground": "#111827",
+  "tableAccent": "#2563EB",
+  "good": "#10B981",
+  "neutral": "#F59E0B",
+  "bad": "#EF4444"
+}

@@ -1,0 +1,171 @@
+// =====================================================================
+// DAX measures for the E-commerce Analytics dashboard
+//
+// How to add one: Modeling tab > New measure, paste ONE measure, Enter.
+// Create a blank table called "_Measures" first (Home > Enter data >
+// Load) and keep all measures in it so they are easy to find.
+//
+// A measure is a calculation that Power BI re-runs for whatever is
+// selected on the page (a month, a state, a category).
+// =====================================================================
+
+
+// ---------------------------------------------------------------------
+// 1. SALES
+// ---------------------------------------------------------------------
+
+Total Revenue = SUM ( fact_orders[revenue] )
+
+Total Orders = COUNTROWS ( fact_orders )
+
+// One customer can have several orders, so count distinct customers.
+Total Customers = DISTINCTCOUNT ( fact_orders[customer_unique_id] )
+
+// DIVIDE returns blank instead of an error when the bottom number is 0.
+Avg Order Value = DIVIDE ( [Total Revenue], [Total Orders] )
+
+Items Sold = COUNTROWS ( fact_order_items )
+
+// Same total as Total Revenue, but from the item table, so it can be
+// split by product category.
+Item Revenue = SUM ( fact_order_items[price] )
+
+// ALL ( dim_category ) removes the category filter, giving the total
+// across every category to divide by.
+Category Revenue Share % =
+DIVIDE (
+    [Item Revenue],
+    CALCULATE ( [Item Revenue], ALL ( dim_category ) )
+)
+
+
+// ---------------------------------------------------------------------
+// 2. TIME INTELLIGENCE
+// These need dim_date to be marked as the date table (see BUILD_GUIDE).
+// ---------------------------------------------------------------------
+
+// DATEADD shifts the selected dates back one month.
+Revenue Previous Month =
+CALCULATE ( [Total Revenue], DATEADD ( dim_date[date], -1, MONTH ) )
+
+MoM Growth % =
+DIVIDE ( [Total Revenue] - [Revenue Previous Month], [Revenue Previous Month] )
+
+Revenue Last Year =
+CALCULATE ( [Total Revenue], SAMEPERIODLASTYEAR ( dim_date[date] ) )
+
+YoY Growth % =
+DIVIDE ( [Total Revenue] - [Revenue Last Year], [Revenue Last Year] )
+
+// Revenue from 1 January up to the selected date.
+Revenue YTD = TOTALYTD ( [Total Revenue], dim_date[date] )
+
+// Revenue from the very first day up to the selected date.
+Running Revenue =
+CALCULATE (
+    [Total Revenue],
+    FILTER ( ALL ( dim_date ), dim_date[date] <= MAX ( dim_date[date] ) )
+)
+
+
+// ---------------------------------------------------------------------
+// 3. CUSTOMERS AND RETENTION
+// ---------------------------------------------------------------------
+
+Customers = COUNTROWS ( dim_customer )
+
+// dim_customer[orders] is each customer's lifetime number of orders.
+Repeat Customers =
+CALCULATE ( COUNTROWS ( dim_customer ), dim_customer[orders] > 1 )
+
+Repeat Rate % = DIVIDE ( [Repeat Customers], [Customers] )
+
+Customer Revenue = SUM ( dim_customer[revenue] )
+
+Revenue per Customer = DIVIDE ( [Customer Revenue], [Customers] )
+
+// Share of all customers that fall in the current segment.
+Customer Share % =
+DIVIDE ( [Customers], CALCULATE ( [Customers], ALL ( dim_customer[segment] ) ) )
+
+Segment Revenue Share % =
+DIVIDE (
+    [Customer Revenue],
+    CALCULATE ( [Customer Revenue], ALL ( dim_customer[segment] ) )
+)
+
+// customer_order_number = 1 is a customer's first ever order.
+New Customer Orders =
+CALCULATE ( [Total Orders], fact_orders[customer_order_number] = 1 )
+
+Returning Customer Orders =
+CALCULATE ( [Total Orders], fact_orders[customer_order_number] > 1 )
+
+Returning Revenue =
+CALCULATE ( [Total Revenue], fact_orders[customer_order_number] > 1 )
+
+Returning Revenue % = DIVIDE ( [Returning Revenue], [Total Revenue] )
+
+// For the cohort matrix. Dividing the two sums (instead of averaging
+// the percentages) keeps row and column totals correct.
+Retention % =
+DIVIDE (
+    SUM ( cohort_retention[active_customers] ),
+    SUM ( cohort_retention[cohort_customers] )
+)
+
+
+// ---------------------------------------------------------------------
+// 4. DELIVERY AND SATISFACTION
+// ---------------------------------------------------------------------
+
+Avg Delivery Days = AVERAGE ( fact_orders[delivery_days] )
+
+// delivered_late is 1 for late, 0 for on time, blank if unknown.
+Late Orders =
+CALCULATE ( [Total Orders], fact_orders[delivered_late] = 1 )
+
+// COUNT skips blanks, so orders with an unknown delivery date are
+// left out of the bottom number.
+Late Delivery % = DIVIDE ( [Late Orders], COUNT ( fact_orders[delivered_late] ) )
+
+Avg Review Score = AVERAGE ( fact_orders[review_score] )
+
+// Share of reviewed orders that got 1 or 2 stars.
+Bad Review % =
+DIVIDE (
+    CALCULATE ( COUNT ( fact_orders[review_score] ), fact_orders[review_score] <= 2 ),
+    COUNT ( fact_orders[review_score] )
+)
+
+
+// =====================================================================
+// CALCULATED COLUMNS
+// How to add one: select the table in the Data pane, then
+// Table tools > New column. A column is calculated once per row.
+// =====================================================================
+
+// --- on table fact_orders ---
+
+Delivery Status =
+SWITCH (
+    TRUE (),
+    ISBLANK ( fact_orders[delivered_late] ), "Unknown",
+    fact_orders[delivered_late] = 1, "Late",
+    "On time"
+)
+
+// The number prefix makes the bands sort in the right order.
+Delivery Time Band =
+SWITCH (
+    TRUE (),
+    ISBLANK ( fact_orders[delivery_days] ), "Unknown",
+    fact_orders[delivery_days] <= 7, "1. Up to 7 days",
+    fact_orders[delivery_days] <= 14, "2. 8 to 14 days",
+    fact_orders[delivery_days] <= 21, "3. 15 to 21 days",
+    fact_orders[delivery_days] <= 28, "4. 22 to 28 days",
+    "5. Over 28 days"
+)
+
+Customer Type =
+IF ( fact_orders[customer_order_number] = 1, "New", "Returning" )

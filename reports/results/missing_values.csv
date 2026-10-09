@@ -1,0 +1,6 @@
+field,missing
+products.product_category,610
+orders.order_delivered_customer_date (all orders),2965
+orders.order_delivered_customer_date (delivered only),8
+delivered orders with no review,646
+orders with no items,775

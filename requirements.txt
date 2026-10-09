@@ -1,0 +1,12 @@
+pandas>=2.2
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9.10
+python-dotenv>=1.0
+kagglehub>=0.3
+
+# notebook and charts
+jupyter>=1.0
+matplotlib>=3.9
+seaborn>=0.13
+
+pytest>=8.0
